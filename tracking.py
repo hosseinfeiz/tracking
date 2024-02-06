@@ -20,6 +20,37 @@ from inference.inference_utils import (add_new_classes_to_dict,
 from inference.interact.interactive_utils import torch_prob_to_numpy_mask
 from tracker import Tracker
 from pose_estimation import Yolov8PoseModel
+import xml.etree.ElementTree as ET
+
+def write_xml_file(boxes, counter, path):
+    try:
+        tree = ET.parse(f'{path[-1]}.xml')
+        root = tree.getroot()
+    except FileNotFoundError:
+        root = ET.Element('mocap')
+        # for bbox in mask_bboxes_with_idx:
+        #     person_id = bbox[0]
+        #     x1 = bbox[1]
+        #     y1 = bbox[2]
+        #     x2 = bbox[3]
+        #     y2 = bbox[4]
+    keyframe = ET.SubElement(root, "keyframe", key=str(counter))
+    for box_idx in range(len(boxes)):
+        person_id = int(boxes[box_idx][0])
+        person_data = boxes[box_idx][1:]
+        bbox = " ".join([f"{value:.2f}" for value in person_data])
+        # Convert tensor values to formatted strings
+        key = ET.SubElement(keyframe, "key", personID=str(person_id), bbox=bbox)
+        key.text = '\n'
+
+    xml_string = ET.tostring(root, encoding="utf-8").decode()
+    xml_string_with_linebreaks = xml_string.replace('><', '>\n<')
+    path_to_directory = 'tracks'
+    os.makedirs(path_to_directory, exist_ok=True)
+    xml_path = f'{path[-1]}.xml'
+    with open(xml_path, 'w+', encoding='utf-8') as xml_file:
+        xml_file.write(xml_string_with_linebreaks)
+
 
 if __name__ == '__main__':
     warnings.filterwarnings('ignore')
@@ -144,19 +175,7 @@ if __name__ == '__main__':
                     result.write(frame)
 
             if len(mask_bboxes_with_idx) > 0:
-                for bbox in mask_bboxes_with_idx:
-                    person_id = bbox[0]
-                    x1 = bbox[1]
-                    y1 = bbox[2]
-                    x2 = bbox[3]
-                    y2 = bbox[4]
-                    df.loc[len(df.index)] = [
-                        int(current_frame_index), person_id, x1, y1, x2, y2]
-            else:
-                df.loc[len(df.index)] = [int(current_frame_index),
-                                         None, None, None, None, None]
-            print(
-                f'current_frame_index: {current_frame_index}, persons in frame: {len(mask_bboxes_with_idx)}')
+                write_xml_file(mask_bboxes_with_idx, current_frame_index, args.video_path[:-4])
             current_frame_index += 1
 
     df.to_csv(args.output_path, index=False)
