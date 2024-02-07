@@ -21,9 +21,7 @@ from inference.interact.interactive_utils import torch_prob_to_numpy_mask
 from tracker import Tracker
 from pose_estimation import Yolov8PoseModel
 import xml.etree.ElementTree as ET
-fraction = 0.4
-device = torch.device('cuda:0')  # specify the CUDA device
-torch.cuda.set_per_process_memory_fraction(fraction, device)
+
 def write_xml_file(boxes, counter, path):
     try:
         tree = ET.parse(f'{path[:-9]}/tracks/{path[-1]}.xml')
@@ -101,7 +99,7 @@ if __name__ == '__main__':
     current_frame_index = 0
     class_label_mapping = {}
 
-    with torch.cuda.amp.autocast(enabled=False):
+    with torch.cuda.amp.autocast(enabled=True):
 
         while (cap.isOpened()):
             _, frame = cap.read()
@@ -157,6 +155,7 @@ if __name__ == '__main__':
 
                     # VISUALIZATION
             if args.output_video_path is not None:
+                
                 if len(mask_bboxes_with_idx) > 0:
                     for bbox in mask_bboxes_with_idx:
                         cv2.rectangle(frame, (int(bbox[1]), int(bbox[2])), (int(
@@ -171,9 +170,7 @@ if __name__ == '__main__':
                 else:
                     result.write(frame)
 
-            
             current_frame_index += 1
 
-    # df.to_csv(args.output_path, index=False)
     if args.output_video_path is not None:
         result.release()

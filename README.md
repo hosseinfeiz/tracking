@@ -1,4 +1,5 @@
 # AutoTrackAnything
+python3 tracking.py --video_path=new/05_April_2023_09_21_07_00_00_00_00_01_32/1.mp4 --output_video_path=new/05_April_2023_09_21_07_00_00_00_00_01_32/vis_1.mp4 
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1NLLtHFcoPH-vncLH_pAwGI4wpH5PhGol?usp=sharing)
 

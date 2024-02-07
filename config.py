@@ -11,7 +11,7 @@ KEYPOINTS = ["nose", "left_eye", "right_eye", "left_ear", "right_ear", "left_sho
 # Our confidence for used keypoints
 KPTS_CONF = 0.6
 
-IOU_THRESHOLD = 0.1
+IOU_THRESHOLD = 0.15
 
 # It's xMem original config, you can try to change this values for your task (check xMem article)
 XMEM_CONFIG = {
@@ -33,4 +33,4 @@ MAX_OBJECT_CNT = 20
 YOLO_EVERY = 20
 
 # Resize processed video. For better results you can increase resolution
-INFERENCE_SIZE = (960, 500)
+INFERENCE_SIZE = (1280, 720)
