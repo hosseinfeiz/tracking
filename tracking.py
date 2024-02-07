@@ -21,19 +21,16 @@ from inference.interact.interactive_utils import torch_prob_to_numpy_mask
 from tracker import Tracker
 from pose_estimation import Yolov8PoseModel
 import xml.etree.ElementTree as ET
-
+fraction = 0.4
+device = torch.device('cuda:0')  # specify the CUDA device
+torch.cuda.set_per_process_memory_fraction(fraction, device)
 def write_xml_file(boxes, counter, path):
     try:
-        tree = ET.parse(f'{path[-1]}.xml')
+        tree = ET.parse(f'{path[:-9]}/tracks/{path[-1]}.xml')
         root = tree.getroot()
     except FileNotFoundError:
         root = ET.Element('mocap')
-        # for bbox in mask_bboxes_with_idx:
-        #     person_id = bbox[0]
-        #     x1 = bbox[1]
-        #     y1 = bbox[2]
-        #     x2 = bbox[3]
-        #     y2 = bbox[4]
+
     keyframe = ET.SubElement(root, "keyframe", key=str(counter))
     for box_idx in range(len(boxes)):
         person_id = int(boxes[box_idx][0])
@@ -45,11 +42,12 @@ def write_xml_file(boxes, counter, path):
 
     xml_string = ET.tostring(root, encoding="utf-8").decode()
     xml_string_with_linebreaks = xml_string.replace('><', '>\n<')
-    path_to_directory = 'tracks'
+    path_to_directory = f'{path[:-9]}/tracks'
     os.makedirs(path_to_directory, exist_ok=True)
-    xml_path = f'{path[-1]}.xml'
+    xml_path = f'{path[:-9]}/tracks/{path[-1]}.xml'
     with open(xml_path, 'w+', encoding='utf-8') as xml_file:
         xml_file.write(xml_string_with_linebreaks)
+    xml_file.close()
 
 
 if __name__ == '__main__':
@@ -87,8 +85,7 @@ if __name__ == '__main__':
     torch.set_grad_enabled(False)
 
     cap = cv2.VideoCapture(args.video_path)
-    df = pd.DataFrame(
-        columns=['frame_id', 'person_id', 'x1', 'y1', 'x2', 'y2'])
+    df = pd.DataFrame(columns=['frame_id', 'person_id', 'x1', 'y1', 'x2', 'y2'])
 
     if args.output_video_path is not None:
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -104,7 +101,7 @@ if __name__ == '__main__':
     current_frame_index = 0
     class_label_mapping = {}
 
-    with torch.cuda.amp.autocast(enabled=True):
+    with torch.cuda.amp.autocast(enabled=False):
 
         while (cap.isOpened()):
             _, frame = cap.read()
@@ -153,7 +150,7 @@ if __name__ == '__main__':
                 masks = torch.tensor(
                     torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
                 mask_bboxes_with_idx = tracker.masks_to_boxes_with_ids(masks)
-
+                write_xml_file(mask_bboxes_with_idx, current_frame_index, args.video_path[:-4])
                 if current_frame_index % args.yolo_every == 0:
                     filtered_bboxes = get_iou_filtered_yolo_mask_bboxes(
                         yolo_filtered_bboxes, mask_bboxes_with_idx, iou_threshold=args.iou_thresh)
@@ -174,10 +171,9 @@ if __name__ == '__main__':
                 else:
                     result.write(frame)
 
-            if len(mask_bboxes_with_idx) > 0:
-                write_xml_file(mask_bboxes_with_idx, current_frame_index, args.video_path[:-4])
+            
             current_frame_index += 1
 
-    df.to_csv(args.output_path, index=False)
+    # df.to_csv(args.output_path, index=False)
     if args.output_video_path is not None:
         result.release()
