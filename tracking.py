@@ -21,7 +21,6 @@ from inference.interact.interactive_utils import torch_prob_to_numpy_mask
 from tracker import Tracker
 from pose_estimation import Yolov8PoseModel
 import xml.etree.ElementTree as ET
-
 def write_xml_file(boxes, counter, path):
     try:
         tree = ET.parse(f'{path[:-9]}/tracks/{path[-1]}.xml')
@@ -76,6 +75,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+
     if torch.cuda.device_count() > 1:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.device
 
@@ -98,6 +98,8 @@ if __name__ == '__main__':
 
     current_frame_index = 0
     class_label_mapping = {}
+
+    tracking_results = []  # Accumulate tracking results
 
     with torch.cuda.amp.autocast(enabled=True):
 
@@ -145,17 +147,18 @@ if __name__ == '__main__':
                 else:  # Only predict
                     prediction = tracker.predict(frame)
 
-                masks = torch.tensor(
-                    torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
+                masks = torch.tensor(torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
                 mask_bboxes_with_idx = tracker.masks_to_boxes_with_ids(masks)
-                write_xml_file(mask_bboxes_with_idx, current_frame_index, args.video_path[:-4])
+                tracking_results.append((mask_bboxes_with_idx, current_frame_index))  # Store tracking results for this frame
+
+                # No need to call write_xml_file here
+
                 if current_frame_index % args.yolo_every == 0:
                     filtered_bboxes = get_iou_filtered_yolo_mask_bboxes(
                         yolo_filtered_bboxes, mask_bboxes_with_idx, iou_threshold=args.iou_thresh)
 
                     # VISUALIZATION
             if args.output_video_path is not None:
-                
                 if len(mask_bboxes_with_idx) > 0:
                     for bbox in mask_bboxes_with_idx:
                         cv2.rectangle(frame, (int(bbox[1]), int(bbox[2])), (int(
@@ -174,3 +177,7 @@ if __name__ == '__main__':
 
     if args.output_video_path is not None:
         result.release()
+
+    # After the loop, save all tracking results to XML
+    for result, frame_index in tracking_results:
+        write_xml_file(result, frame_index, args.video_path[:-4])
