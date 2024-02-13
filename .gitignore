@@ -9,6 +9,7 @@ saves/
 *.mp4
 *.pt
 # Distribution / packaging
+new/
 .Python
 build/
 develop-eggs/
