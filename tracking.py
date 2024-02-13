@@ -21,6 +21,8 @@ from inference.interact.interactive_utils import torch_prob_to_numpy_mask
 from tracker import Tracker
 from pose_estimation import Yolov8PoseModel
 import xml.etree.ElementTree as ET
+
+
 def write_xml_file(boxes, counter, path):
     try:
         tree = ET.parse(f'{path[:-9]}/tracks/{path[-1]}.xml')
@@ -32,6 +34,7 @@ def write_xml_file(boxes, counter, path):
     for box_idx in range(len(boxes)):
         person_id = int(boxes[box_idx][0])
         person_data = boxes[box_idx][1:]
+        person_data.append(1.0)
         bbox = " ".join([f"{value:.2f}" for value in person_data])
         # Convert tensor values to formatted strings
         key = ET.SubElement(keyframe, "key", personID=str(person_id), bbox=bbox)
@@ -74,7 +77,6 @@ if __name__ == '__main__':
                         default='tracking_results.csv', required=False, help='Output filepath')
 
     args = parser.parse_args()
-
 
     if torch.cuda.device_count() > 1:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.device
