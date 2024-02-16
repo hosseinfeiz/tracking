@@ -10,7 +10,8 @@ class Yolov8PoseModel:
     def __init__(self, device: str, person_conf, kpts_threshold):
         self.person_conf = person_conf
         self.kpts_threshold = kpts_threshold
-        self.model = YOLO('yolov8l-pose.pt')
+        self.model = YOLO('yolov8l.pt')
+
         
     def run_inference(self, image):
         results = self.model(image)
@@ -18,21 +19,17 @@ class Yolov8PoseModel:
     
     def get_filtered_bboxes_by_confidence(self, image):
         results = self.run_inference(image)
-        
-        conf_filtered_bboxes = []
+
+        conf_filtered_bboxes = [] #01_April_2023_10_53_54_00_00_00_00_01_19
         
         for result in results:
             boxes = result.boxes.cpu().numpy()
-            all_kpts = result.keypoints
+            # all_kpts = result.keypoints
             for i, box in enumerate(boxes):
-                single_kpts_conf = all_kpts[i].conf
                 
-                r_sho_proba = single_kpts_conf[0].cpu().numpy()[KEYPOINTS.index("right_shoulder")]
-                l_sho_proba = single_kpts_conf[0].cpu().numpy()[KEYPOINTS.index("left_shoulder")]
-                r_hip_proba = single_kpts_conf[0].cpu().numpy()[KEYPOINTS.index("right_hip")]
-                l_hip_proba = single_kpts_conf[0].cpu().numpy()[KEYPOINTS.index("left_hip")]
-                
-                if box.conf[0] > self.person_conf and ((r_sho_proba or l_sho_proba) >= self.kpts_threshold) and ((r_hip_proba or l_hip_proba) >= self.kpts_threshold):
+                if box.conf[0] > self.person_conf and box.cls[0] == 0:
+                    
+
                     conf_filtered_bboxes.append( box.xyxy[0].astype(int))
         
         return conf_filtered_bboxes

@@ -34,6 +34,11 @@ def write_xml_file(boxes, counter, path):
     for box_idx in range(len(boxes)):
         person_id = int(boxes[box_idx][0])
         person_data = boxes[box_idx][1:]
+        person_data = [
+        person_data[0] * 2,
+        person_data[1] * 2.16,  
+        person_data[2] * 2,  
+        person_data[3] * 2.16]
         person_data.append(1.0)
         bbox = " ".join([f"{value:.2f}" for value in person_data])
         # Convert tensor values to formatted strings
