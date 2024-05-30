@@ -40,7 +40,7 @@ class Tracker:
 
         return result
 
-    def create_mask_from_img(self, image, yolov7_bboxes, sam_checkpoint='./saves/sam_hq_vit_h.pth', model_type='vit_h', device='0'):
+    def create_mask_from_img(self, image, yolov7_bboxes, sam_checkpoint='./saves/sam_hq_vit_b.pth', model_type='vit_b', device='0'):
         sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
         if self.device.lower() != 'cpu':
             sam.to(device=f'cuda:{device}')

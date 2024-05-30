@@ -5,7 +5,7 @@ import random
 import cv2
 import numpy as np
 import torch
-from mobile_sam import SamAutomaticMaskGenerator
+# from mobile_sam import SamAutomaticMaskGenerator
 from PIL import Image
 from skimage.measure import label, regionprops
 
