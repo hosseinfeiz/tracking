@@ -5,8 +5,7 @@ import random
 import cv2
 import numpy as np
 import torch
-from mobile_sam import (SamAutomaticMaskGenerator, SamPredictor,
-                        sam_model_registry)
+from mobile_sam import SamAutomaticMaskGenerator
 from PIL import Image
 from skimage.measure import label, regionprops
 
@@ -14,7 +13,7 @@ from config import (DEVICE, IOU_THRESHOLD, KPTS_CONF, MAX_OBJECT_CNT,
                     PERSON_CONF, XMEM_CONFIG)
 
 os.environ['CUDA_VISIBLE_DEVICES'] = DEVICE
-
+from segment_anything import SamPredictor, sam_model_registry
 torch.cuda.empty_cache()
 
 
@@ -61,7 +60,7 @@ def masks_on_im(masks, image):
     return result
 
 
-def create_mask_from_img(image, yolov7_bboxes, save_path=None, sam_checkpoint='./saves/mobile_sam.pt', model_type='vit_t', device='0'):
+def create_mask_from_img(image, yolov7_bboxes, save_path=None, sam_checkpoint='./saves/sam_hq_vit_b.pt', model_type='vit_b', device='0'):
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
     sam.to(device=f'cuda:{device}')
 

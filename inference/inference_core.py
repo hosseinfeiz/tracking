@@ -83,10 +83,10 @@ class InferenceCore:
                 pred_prob_no_bg[:, mask_regions] = 0
                 # shift by 1 because mask/pred_prob_no_bg do not contain background
                 mask = mask.type_as(pred_prob_no_bg)
-                if valid_labels is not None:
-                    shift_by_one_non_labels = [i for i in range(pred_prob_no_bg.shape[0]) if (i+1) not in valid_labels]
-                    # non-labelled objects are copied from the predicted mask
-                    mask[shift_by_one_non_labels] = pred_prob_no_bg[shift_by_one_non_labels]
+                # if valid_labels is not None:
+                #     shift_by_one_non_labels = [i for i in range(pred_prob_no_bg.shape[0]) if (i+1) not in valid_labels]
+                #     # non-labelled objects are copied from the predicted mask
+                #     mask[shift_by_one_non_labels] = pred_prob_no_bg[shift_by_one_non_labels]
             pred_prob_with_bg = aggregate(mask, dim=0)
 
             # also create new hidden states

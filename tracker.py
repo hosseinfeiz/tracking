@@ -2,7 +2,8 @@
 import cv2
 import numpy as np
 import torch
-from mobile_sam import SamPredictor, sam_model_registry
+# from mobile_sam import SamPredictor, sam_model_registry
+from segment_anything import SamPredictor, sam_model_registry
 
 from skimage import measure
 
@@ -10,6 +11,7 @@ from inference.inference_core import InferenceCore
 from inference.interact.interactive_utils import (image_to_torch,
                                                   index_numpy_to_one_hot_torch)
 from model.network import XMem
+
 
 class Tracker:
     def __init__(self, xmem_config, max_obj_cnt, device):
@@ -38,7 +40,7 @@ class Tracker:
 
         return result
 
-    def create_mask_from_img(self, image, yolov7_bboxes, sam_checkpoint='./saves/mobile_sam.pt', model_type='vit_t', device='0'):
+    def create_mask_from_img(self, image, yolov7_bboxes, sam_checkpoint='./saves/sam_hq_vit_h.pth', model_type='vit_h', device='0'):
         sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
         if self.device.lower() != 'cpu':
             sam.to(device=f'cuda:{device}')
@@ -88,7 +90,7 @@ class Tracker:
         result = self.masks_on_im(
             [mask.cpu().squeeze().numpy().astype(np.uint8) for mask in masks], image)
         result = result[:, :, 0]
-        
+
 
         # Filter result from small segmented areas, if np.uniq(result) > len(yolov7bboxes)
         if len(np.unique(result)) > len(yolov7_bboxes) + 1:

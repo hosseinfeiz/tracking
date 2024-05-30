@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-import csv
 import os
-import sys
 import warnings
 from argparse import ArgumentParser
 
@@ -10,7 +8,6 @@ import numpy as np
 import pandas as pd
 import torch
 from PIL import Image
-
 from config import (DEVICE, INFERENCE_SIZE, IOU_THRESHOLD, KPTS_CONF,
                     MAX_OBJECT_CNT, PERSON_CONF, XMEM_CONFIG, YOLO_EVERY)
 from inference.inference_utils import (add_new_classes_to_dict,
@@ -22,37 +19,39 @@ from tracker import Tracker
 from pose_estimation import Yolov8PoseModel
 import xml.etree.ElementTree as ET
 
-
-def write_xml_file(boxes, counter, path):
+def write_xml_file(data, path, frame_idx, frame_height, frame_width):
     try:
-        tree = ET.parse(f'{path[:-9]}/tracks/{path[-1]}.xml')
-        root = tree.getroot()
+        track_file = os.path.dirname(path)
+        if not os.path.exists(track_file):
+            os.makedirs(track_file)
+        
+        # Check if the file exists
+        if os.path.isfile(path):
+            # File exists, open it for appending
+            tree = ET.parse(path)
+            root = tree.getroot()
+        else:
+            # File doesn't exist, create a new root element
+            root = ET.Element("mocap")
+            tree = ET.ElementTree(root)
+
     except FileNotFoundError:
-        root = ET.Element('mocap')
+        root = ET.Element("mocap")
+        tree = ET.ElementTree(root)
 
-    keyframe = ET.SubElement(root, "keyframe", key=str(counter))
-    for box_idx in range(len(boxes)):
-        person_id = int(boxes[box_idx][0])
-        person_data = boxes[box_idx][1:]
-        person_data = [
-        person_data[0] * 2,
-        person_data[1] * 2.16,  
-        person_data[2] * 2,  
-        person_data[3] * 2.16]
-        person_data.append(1.0)
-        bbox = " ".join([f"{value:.2f}" for value in person_data])
-        # Convert tensor values to formatted strings
-        key = ET.SubElement(keyframe, "key", personID=str(person_id), bbox=bbox)
-        key.text = '\n'
-
-    xml_string = ET.tostring(root, encoding="utf-8").decode()
-    xml_string_with_linebreaks = xml_string.replace('><', '>\n<')
-    path_to_directory = f'{path[:-9]}/tracks'
-    os.makedirs(path_to_directory, exist_ok=True)
-    xml_path = f'{path[:-9]}/tracks/{path[-1]}.xml'
-    with open(xml_path, 'w+', encoding='utf-8') as xml_file:
-        xml_file.write(xml_string_with_linebreaks)
-    xml_file.close()
+    keyframe = ET.SubElement(root, "keyframe", key="{:06}".format(frame_idx))
+    for person_id, bbox in data.items():
+        person_key = ET.SubElement(keyframe, "key")
+        person_key.set("personID", str(person_id))
+        scale_y = frame_height / INFERENCE_SIZE[1]
+        scale_x = frame_width / INFERENCE_SIZE[0]
+        rescaled_person_data = [bbox[0] * scale_x, bbox[1] * scale_x, bbox[2] * scale_y, bbox[3] * scale_y, 0.9]
+        person_key.set("bbox", " ".join(f"{value:.2f}" for value in rescaled_person_data))
+    keyframe.tail = "\n"
+    
+    # Open the file in write mode if it doesn't exist, and append mode if it does
+    with open(path, 'wb') as file:  
+        tree.write(file)
 
 
 if __name__ == '__main__':
@@ -78,8 +77,8 @@ if __name__ == '__main__':
                         required=False, help='IOU threshold to find new persons bboxes')
     parser.add_argument('--yolo_every', type=int, default=YOLO_EVERY,
                         required=False, help='Find new persons with YOLO every N frames')
-    parser.add_argument('--output_path', type=str,
-                        default='tracking_results.csv', required=False, help='Output filepath')
+    parser.add_argument('--output_track', type=str,
+                        default='tracking_results.xml', required=False, help='Output filepath')
 
     args = parser.parse_args()
 
@@ -90,7 +89,8 @@ if __name__ == '__main__':
     torch.set_grad_enabled(False)
 
     cap = cv2.VideoCapture(args.video_path)
-    df = pd.DataFrame(columns=['frame_id', 'person_id', 'x1', 'y1', 'x2', 'y2'])
+    df = pd.DataFrame(
+        columns=['frame_id', 'person_id', 'x1', 'y1', 'x2', 'y2'])
 
     if args.output_video_path is not None:
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -105,23 +105,31 @@ if __name__ == '__main__':
 
     current_frame_index = 0
     class_label_mapping = {}
-
-    tracking_results = []  # Accumulate tracking results
-
+    
     with torch.cuda.amp.autocast(enabled=True):
 
         while (cap.isOpened()):
             _, frame = cap.read()
-
+            frame_height, frame_width, _ = frame.shape
             if frame is None or (args.frames_to_propagate is not None and current_frame_index == args.frames_to_propagate):
                 break
-
+            frame_c = frame
             frame = cv2.resize(frame, (args.width, args.height),
                                interpolation=cv2.INTER_AREA)
             if current_frame_index % args.yolo_every == 0:
-                yolo_filtered_bboxes = yolov8pose_model.get_filtered_bboxes_by_confidence(frame)
-
-            if len(yolo_filtered_bboxes) > 0:
+                yolo_filtered_bboxes = yolov8pose_model.get_filtered_bboxes_by_confidence(frame_c)
+                rescaled_bboxes = []
+                scale_y = INFERENCE_SIZE[1]/frame_height
+                scale_x = INFERENCE_SIZE[0]/frame_width
+                for bbox in yolo_filtered_bboxes:
+                    xmin, ymin, xmax, ymax = bbox
+                    rescaled_bboxes.append([
+                        int(xmin * scale_x),
+                        int(ymin * scale_x),
+                        int(xmax * scale_y),
+                        int(ymax * scale_y),
+                    ])
+            if len(rescaled_bboxes) > 0:
                 persons_in_video = True
             else:
                 masks = []
@@ -130,7 +138,7 @@ if __name__ == '__main__':
             if persons_in_video:
                 if len(class_label_mapping) == 0:  # First persons in video
                     mask = tracker.create_mask_from_img(
-                        frame, yolo_filtered_bboxes, device='0')
+                        frame, rescaled_bboxes, device='0')
                     unique_labels = np.unique(mask)
                     class_label_mapping = {
                         label: idx for idx, label in enumerate(unique_labels)}
@@ -154,17 +162,21 @@ if __name__ == '__main__':
                 else:  # Only predict
                     prediction = tracker.predict(frame)
 
-                masks = torch.tensor(torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
+                masks = torch.tensor(
+                    torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
+                masks = tracker.keep_largest_connected_components(masks)
                 mask_bboxes_with_idx = tracker.masks_to_boxes_with_ids(masks)
-                tracking_results.append((mask_bboxes_with_idx, current_frame_index))  # Store tracking results for this frame
-
-                # No need to call write_xml_file here
+                tracking_results = {}
+                for box_idx, box in enumerate(mask_bboxes_with_idx):
+                    person_id = box[0]
+                    person_data = box[1:]
+                    tracking_results[person_id] = person_data  # Store tracking results for this frame
 
                 if current_frame_index % args.yolo_every == 0:
                     filtered_bboxes = get_iou_filtered_yolo_mask_bboxes(
-                        yolo_filtered_bboxes, mask_bboxes_with_idx, iou_threshold=args.iou_thresh)
-
-                    # VISUALIZATION
+                        rescaled_bboxes, mask_bboxes_with_idx, iou_threshold=args.iou_thresh)
+                write_xml_file(tracking_results, args.output_track, current_frame_index, frame_height, frame_width)
+            # VISUALIZATION
             if args.output_video_path is not None:
                 if len(mask_bboxes_with_idx) > 0:
                     for bbox in mask_bboxes_with_idx:
@@ -181,10 +193,5 @@ if __name__ == '__main__':
                     result.write(frame)
 
             current_frame_index += 1
-
     if args.output_video_path is not None:
         result.release()
-
-    # After the loop, save all tracking results to XML
-    for result, frame_index in tracking_results:
-        write_xml_file(result, frame_index, args.video_path[:-4])

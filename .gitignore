@@ -2,7 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+track/
+saves/
 # C extensions
 *.so
 saves/
