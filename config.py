@@ -12,28 +12,28 @@ IOU_THRESHOLD = 0.1
 
 # It's xMem original config, you can try to change this values for your task (check xMem article)
 XMEM_CONFIG = {
-    'top_k': 360,
-    'mem_every': 1,
+    'top_k': 80,
+    'mem_every': 5,
     'deep_update_every': -1,
     'enable_long_term': True,
     'enable_long_term_count_usage': True,
-    'num_prototypes': 360,
-    'min_mid_term_frames': 3,
-    'max_mid_term_frames': 9,
+    'num_prototypes': 250,
+    'min_mid_term_frames': 7,
+    'max_mid_term_frames': 30,
     'max_long_term_elements': 10000,
 }
 
 # Max possible count of persons in video (if you has error, set bigger number)
-MAX_OBJECT_CNT = 10
+MAX_OBJECT_CNT = 20
 
 # Check new persons in frame every N frames
-YOLO_EVERY = 1
+YOLO_EVERY = 40
 # INFERENCE_SIZE = (360, 288)
 # INFERENCE_SIZE = (516, 388)
 # INFERENCE_SIZE = (1032, 776)
 # INFERENCE_SIZE = (640, 360)
-# INFERENCE_SIZE = (960, 540)
-# INFERENCE_SIZE = (960, 540)
-
-INFERENCE_SIZE = (1920, 1080)
+INFERENCE_SIZE = (960, 540)
+# INFERENCE_SIZE = (480, 270)
+# INFERENCE_SIZE = (1280, 720)
+# INFERENCE_SIZE = (1920, 1080)
 

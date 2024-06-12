@@ -106,92 +106,86 @@ if __name__ == '__main__':
     current_frame_index = 0
     class_label_mapping = {}
     
-    with torch.cuda.amp.autocast(enabled=True):
+with torch.cuda.amp.autocast(enabled=True):
 
-        while (cap.isOpened()):
-            _, frame = cap.read()
-            frame_height, frame_width, _ = frame.shape
-            if frame is None or (args.frames_to_propagate is not None and current_frame_index == args.frames_to_propagate):
-                break
-            frame_c = frame
-            frame = cv2.resize(frame, (args.width, args.height),
-                               interpolation=cv2.INTER_AREA)
-            if current_frame_index % args.yolo_every == 0 and current_frame_index < 300:
-                yolo_filtered_bboxes = yolov8pose_model.get_filtered_bboxes_by_confidence(frame_c)
-                rescaled_bboxes = []
-                scale_y = INFERENCE_SIZE[1]/frame_height
-                scale_x = INFERENCE_SIZE[0]/frame_width
-                for bbox in yolo_filtered_bboxes:
-                    xmin, ymin, xmax, ymax = bbox
-                    rescaled_bboxes.append([
-                        int(xmin * scale_x),
-                        int(ymin * scale_x),
-                        int(xmax * scale_y),
-                        int(ymax * scale_y),
-                    ])
-            if len(rescaled_bboxes) > 0:
-                persons_in_video = True
+    current_frame_index = 0
+    persons_in_video = False
+    class_label_mapping = {}
+    filtered_bboxes = []
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret or frame is None or (args.frames_to_propagate is not None and current_frame_index == args.frames_to_propagate):
+            break
+
+        frame_height, frame_width, _ = frame.shape
+        frame_c = frame.copy()
+        frame = cv2.resize(frame, (args.width, args.height), interpolation=cv2.INTER_AREA)
+
+        if current_frame_index % args.yolo_every == 0 and current_frame_index < 1000:
+            yolo_filtered_bboxes = yolov8pose_model.get_filtered_bboxes_by_confidence(frame_c)
+            rescaled_bboxes = []
+            scale_y = INFERENCE_SIZE[1] / frame_height
+            scale_x = INFERENCE_SIZE[0] / frame_width
+            for bbox in yolo_filtered_bboxes:
+                xmin, ymin, xmax, ymax = bbox
+                rescaled_bboxes.append([
+                    int(xmin * scale_x),
+                    int(ymin * scale_x),
+                    int(xmax * scale_y),
+                    int(ymax * scale_y),
+                ])
+
+        if len(rescaled_bboxes) > 0:
+            persons_in_video = True
+        else:
+            masks = []
+            mask_bboxes_with_idx = []
+
+        if persons_in_video:
+            if len(class_label_mapping) == 0:  # First persons in video
+                mask = tracker.create_mask_from_img(frame, rescaled_bboxes, device='0')
+                unique_labels = np.unique(mask)
+                class_label_mapping = {label: idx for idx, label in enumerate(unique_labels)}
+                mask = np.array([class_label_mapping[label] for label in mask.flat]).reshape(mask.shape)
+                prediction = tracker.add_mask(frame, mask)
+            elif len(filtered_bboxes) > 0:  # Additional/new persons in video
+                mask = tracker.create_mask_from_img(frame, filtered_bboxes, device='0')
+                unique_labels = np.unique(mask)
+                mask_image = Image.fromarray(mask, mode='L')
+                class_label_mapping = add_new_classes_to_dict(unique_labels, class_label_mapping)
+                mask = np.array([class_label_mapping[label] for label in mask.flat]).reshape(mask.shape)
+                merged_mask = merge_masks(masks.squeeze(0), torch.tensor(mask))
+                prediction = tracker.add_mask(frame, merged_mask.squeeze(0).numpy())
+                filtered_bboxes = []
+            else:  # Only predict
+                prediction = tracker.predict(frame)
+
+            masks = torch.tensor(torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
+            mask_bboxes_with_idx = tracker.masks_to_boxes_with_ids(masks)
+            tracking_results = {}
+            for box_idx, box in enumerate(mask_bboxes_with_idx):
+                person_id = box[0]
+                person_data = box[1:]
+                tracking_results[person_id] = person_data  # Store tracking results for this frame
+
+            if current_frame_index % args.yolo_every == 0 and current_frame_index < 1000:
+                filtered_bboxes = get_iou_filtered_yolo_mask_bboxes(rescaled_bboxes, mask_bboxes_with_idx, iou_threshold=args.iou_thresh)
+            write_xml_file(tracking_results, args.output_track, current_frame_index, frame_height, frame_width)
+
+        # VISUALIZATION
+        if args.output_video_path is not None:
+            if len(mask_bboxes_with_idx) > 0:
+                for bbox in mask_bboxes_with_idx:
+                    cv2.rectangle(frame, (int(bbox[1]), int(bbox[2])), (int(bbox[3]), int(bbox[4])), (255, 255, 0), 2)
+                    cv2.putText(frame, f'{bbox[0]}', (int(bbox[1])-10, int(bbox[2])-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+                visualization = overlay_mask_on_image(frame, masks, class_color_mapping, alpha=0.75)
+                visualization = cv2.cvtColor(visualization, cv2.COLOR_BGR2RGB)
+                result.write(visualization)
             else:
-                masks = []
-                mask_bboxes_with_idx = []
+                result.write(frame)
 
-            if persons_in_video:
-                if len(class_label_mapping) == 0:  # First persons in video
-                    mask = tracker.create_mask_from_img(
-                        frame, rescaled_bboxes, device='0')
-                    unique_labels = np.unique(mask)
-                    class_label_mapping = {
-                        label: idx for idx, label in enumerate(unique_labels)}
-                    mask = np.array([class_label_mapping[label]
-                                    for label in mask.flat]).reshape(mask.shape)
-                    prediction = tracker.add_mask(frame, mask)
-                elif len(filtered_bboxes) > 0:  # Additional/new persons in video
-                    mask = tracker.create_mask_from_img(
-                        frame, filtered_bboxes, device='0')
-                    unique_labels = np.unique(mask)
-                    mask_image = Image.fromarray(mask, mode='L')
-                    class_label_mapping = add_new_classes_to_dict(
-                        unique_labels, class_label_mapping)
-                    mask = np.array([class_label_mapping[label]
-                                    for label in mask.flat]).reshape(mask.shape)
-                    merged_mask = merge_masks(
-                        masks.squeeze(0), torch.tensor(mask))
-                    prediction = tracker.add_mask(
-                        frame, merged_mask.squeeze(0).numpy())
-                    filtered_bboxes = []
-                else:  # Only predict
-                    prediction = tracker.predict(frame)
+        current_frame_index += 1
 
-                masks = torch.tensor(
-                    torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
-                masks = tracker.keep_largest_connected_components(masks)
-                mask_bboxes_with_idx = tracker.masks_to_boxes_with_ids(masks)
-                tracking_results = {}
-                for box_idx, box in enumerate(mask_bboxes_with_idx):
-                    person_id = box[0]
-                    person_data = box[1:]
-                    tracking_results[person_id] = person_data  # Store tracking results for this frame
-
-                if current_frame_index % args.yolo_every == 0 and current_frame_index < 300:
-                    filtered_bboxes = get_iou_filtered_yolo_mask_bboxes(
-                        rescaled_bboxes, mask_bboxes_with_idx, iou_threshold=args.iou_thresh)
-                write_xml_file(tracking_results, args.output_track, current_frame_index, frame_height, frame_width)
-            # VISUALIZATION
-            if args.output_video_path is not None:
-                if len(mask_bboxes_with_idx) > 0:
-                    for bbox in mask_bboxes_with_idx:
-                        cv2.rectangle(frame, (int(bbox[1]), int(bbox[2])), (int(
-                            bbox[3]), int(bbox[4])), (255, 255, 0), 2)
-                        cv2.putText(frame, f'{bbox[0]}', (int(
-                            bbox[1])-10, int(bbox[2])-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
-                    visualization = overlay_mask_on_image(
-                        frame, masks, class_color_mapping, alpha=0.75)
-                    visualization = cv2.cvtColor(
-                        visualization, cv2.COLOR_BGR2RGB)
-                    result.write(visualization)
-                else:
-                    result.write(frame)
-
-            current_frame_index += 1
-    if args.output_video_path is not None:
-        result.release()
+if args.output_video_path is not None:
+    result.release()
