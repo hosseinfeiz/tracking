@@ -8,18 +8,18 @@ KEYPOINTS = ["nose", "left_eye", "right_eye", "left_ear", "right_ear", "left_sho
 # Our confidence for used keypoints
 KPTS_CONF = 0.6
 
-IOU_THRESHOLD = 0.1
+IOU_THRESHOLD = 0.2
 
 # It's xMem original config, you can try to change this values for your task (check xMem article)
 XMEM_CONFIG = {
     'top_k': 80,
-    'mem_every': 5,
+    'mem_every': 20,
     'deep_update_every': -1,
     'enable_long_term': True,
     'enable_long_term_count_usage': True,
     'num_prototypes': 250,
     'min_mid_term_frames': 7,
-    'max_mid_term_frames': 30,
+    'max_mid_term_frames': 20,
     'max_long_term_elements': 10000,
 }
 
@@ -27,7 +27,7 @@ XMEM_CONFIG = {
 MAX_OBJECT_CNT = 20
 
 # Check new persons in frame every N frames
-YOLO_EVERY = 40
+YOLO_EVERY = 4
 # INFERENCE_SIZE = (360, 288)
 # INFERENCE_SIZE = (516, 388)
 # INFERENCE_SIZE = (1032, 776)

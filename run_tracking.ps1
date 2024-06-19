@@ -3,7 +3,7 @@ param (
 )
 
 # Define the base directory containing all the folders
-$baseDir = "C:\Users\AR13620\Desktop\physpose\revision"
+$baseDir = "C:\Users\AR13620\Desktop\physpose\new"
 
 foreach ($folderName in $folderNames) {
     $folderPath = Join-Path -Path $baseDir -ChildPath $folderName
@@ -32,5 +32,9 @@ foreach ($folderName in $folderNames) {
         # Run the Python script with the specified arguments
         Write-Host "Processing $videoPath..."
         python tracking.py --video_path $videoPath --output_video_path=$outputVideoPath --output_track=$outputTrackPath
+        
+        # Pause for 100 seconds before processing the next video
+        Write-Host "Pausing for 100 seconds..."
+        Start-Sleep -Seconds 120
     }
 }
