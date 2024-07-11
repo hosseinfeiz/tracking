@@ -122,7 +122,7 @@ with torch.cuda.amp.autocast(enabled=True):
         frame_c = frame.copy()
         frame = cv2.resize(frame, (args.width, args.height), interpolation=cv2.INTER_AREA)
 
-        if current_frame_index % args.yolo_every == 0 and current_frame_index < 300:
+        if current_frame_index % args.yolo_every == 0 and current_frame_index < 600:
             yolo_filtered_bboxes = yolov8pose_model.get_filtered_bboxes_by_confidence(frame_c)
             rescaled_bboxes = []
             scale_y = INFERENCE_SIZE[1] / frame_height
@@ -162,6 +162,7 @@ with torch.cuda.amp.autocast(enabled=True):
                 prediction = tracker.predict(frame)
 
             masks = torch.tensor(torch_prob_to_numpy_mask(prediction)).unsqueeze(0)
+            masks = tracker.keep_largest_connected_components(masks)
             mask_bboxes_with_idx = tracker.masks_to_boxes_with_ids(masks)
             tracking_results = {}
             for box_idx, box in enumerate(mask_bboxes_with_idx):
@@ -169,7 +170,7 @@ with torch.cuda.amp.autocast(enabled=True):
                 person_data = box[1:]
                 tracking_results[person_id] = person_data  # Store tracking results for this frame
 
-            if current_frame_index % args.yolo_every == 0 and current_frame_index < 300:
+            if current_frame_index % args.yolo_every == 0 and current_frame_index < 600:
                 filtered_bboxes = get_iou_filtered_yolo_mask_bboxes(rescaled_bboxes, mask_bboxes_with_idx, iou_threshold=args.iou_thresh)
             write_xml_file(tracking_results, args.output_track, current_frame_index, frame_height, frame_width)
 

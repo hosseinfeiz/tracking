@@ -79,7 +79,7 @@ class InferenceCore:
             if pred_prob_no_bg is not None:
                 # if we have a predicted mask, we work on it
                 # make pred_prob_no_bg consistent with the input mask
-                mask_regions = (mask.sum(0) > 0.4)
+                mask_regions = (mask.sum(0) > 0.3)
                 pred_prob_no_bg[:, mask_regions] = 0
                 # shift by 1 because mask/pred_prob_no_bg do not contain background
                 mask = mask.type_as(pred_prob_no_bg)

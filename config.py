@@ -1,7 +1,7 @@
 DEVICE = '0' # For GPU set device num which you want to use (or set 'cpu', but it's too slow)
 
 # Our confidence for every person (bbox)
-PERSON_CONF = 0.5
+PERSON_CONF = 0.7
 
 KEYPOINTS = ["nose", "left_eye", "right_eye", "left_ear", "right_ear", "left_shoulder", "right_shoulder", "left_elbow", "right_elbow", "left_wrist", "right_wrist", "left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle"]
 
@@ -13,13 +13,13 @@ IOU_THRESHOLD = 0.2
 # It's xMem original config, you can try to change this values for your task (check xMem article)
 XMEM_CONFIG = {
     'top_k': 80,
-    'mem_every': 20,
+    'mem_every': 14,
     'deep_update_every': -1,
     'enable_long_term': True,
     'enable_long_term_count_usage': True,
-    'num_prototypes': 250,
-    'min_mid_term_frames': 7,
-    'max_mid_term_frames': 20,
+    'num_prototypes': 200,
+    'min_mid_term_frames': 20,
+    'max_mid_term_frames': 30,
     'max_long_term_elements': 10000,
 }
 
@@ -27,7 +27,7 @@ XMEM_CONFIG = {
 MAX_OBJECT_CNT = 20
 
 # Check new persons in frame every N frames
-YOLO_EVERY = 4
+YOLO_EVERY = 2
 # INFERENCE_SIZE = (360, 288)
 # INFERENCE_SIZE = (516, 388)
 # INFERENCE_SIZE = (1032, 776)
